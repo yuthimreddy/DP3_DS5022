@@ -1,0 +1,6 @@
+# .gitignore
+.chalice/deployments/
+.chalice/deployed/
+__pycache__/
+*.pyc
+.env
