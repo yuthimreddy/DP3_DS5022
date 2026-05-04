@@ -52,7 +52,7 @@ def scan_recent_recalls(days: int = 90) -> list[dict]:
         )
         items.extend(response("Items", []))
 
-        while "LastEvaluatedKey" in response:
+        while "LastEvaluatedKey" in response: # if we have more results to paginate through, keep scanning
             response = table.scan(
                 FilterExpression="report_date >= :cutoff",
                 ExpressionAttributeValues={":cutoff": cutoff},
@@ -64,7 +64,7 @@ def scan_recent_recalls(days: int = 90) -> list[dict]:
     except ClientError as e:
         logger.error("DynamoDB scan failed: %s", e)
         raise
-
+# does a full scan and sort to find the most recent recall. This is not the most efficient way to do this, but it avoids the need for a secondary index on report_date.
 def get_latest_recall() -> dict | None:
     """Return the single most recent recall from DynamoDB through a full scan and sort"""
     try:
@@ -78,7 +78,7 @@ def get_latest_recall() -> dict | None:
     except Exception as e:
         logger.error("Error fetching latest recall: %s", e)
         raise
-
+# Function to generate and upload plot to S3:
 def generate_and_upload_plot(items: list[dict]) -> str:
     """Build a weekly bar char of recall counts from `items` and upload to S3. Returns the S3 URL of the plot."""
     logger.info("generating plot from %ed items", len(items))
@@ -93,7 +93,8 @@ def generate_and_upload_plot(items: list[dict]) -> str:
             week_counts[week_start] += 1
         except (ValueError, TypeError):
             logger.debug("Could not parse report_date: %s", date_str)
-
+# if there is no plottable data, raise an error to avoid uploading 
+# an empty plot
     if not week_counts:
         logger.warning("No plottable data found")
         raise ValueError("No data to plot")
@@ -136,6 +137,7 @@ def generate_and_upload_plot(items: list[dict]) -> str:
 
 # Routes:
 
+# Provides a simple overview of the API and its resources.
 @app.route("/")
 def index():
     return{
@@ -146,7 +148,9 @@ def index():
         ),
         "resources": ["current", "trend", "plot"],
         }
-
+# Returns a text summary of the most recent recall, including the recalling 
+# firm, product description, reason for recall, and report date. This gives
+# users a quick snapshot of the latest recall activity.
 @app.route("/current")
 def current():
     """Return the most recent food recall."""
@@ -172,7 +176,8 @@ def current():
         logger.error("/current error: %s", e)
         return {"response": f"Error retrieving current recall: {e}"}
 
-
+# returns a text summary of recall trends over the last 90 days, broken down by FDA classification (I, II, III) and total count. 
+# This is a simple way to track whether recall activity is increasing or decreasing over time, and whether the severity of recalls is changing.
 @app.route("/trend")
 def trend():
     """Return recall counts broken down by classification over the last 90 days."""
@@ -201,7 +206,16 @@ def trend():
     except Exception as e:
         logger.error("/trend error: %s", e)
         return {"response": f"Error computing trend: {e}"}
-    
+# generates a weekly bar chart of recall counts for the last 90 days, and
+# returns the S3 URL of the plot. This provides users with a visual 
+# representation of recall activity over time, making it easier to spot 
+# trends and patterns.
+
+# The plot is cached in S3 and only updated when this endpoint is called
+# so the first call may take a few seconds to generate and upload the plot
+# but subsequent calls will be fast until new data comes in. This is a
+# simple way to balance performance with up-to-date visuals without needing a
+# separate caching layer or scheduled job.
 @app.route("/plot")
 def plot():
     """Generate (or return cached) a weekly recall bar chart from S3."""
