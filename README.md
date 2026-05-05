@@ -109,10 +109,3 @@ Set env vars on the deployed Lambda:
 ```
 /register <your-project-id> <your-username> <your-api-gateway-url>
 ```
-
----
-
-## Stretch Goals (if time permits)
-- `/alerts` resource flagging unusually high recall weeks (>2 std devs above mean)
-- `/plot/{window}` parameterized for 30d, 60d, 90d windows
-- `/state/{state}` for per-state recall breakdowns
