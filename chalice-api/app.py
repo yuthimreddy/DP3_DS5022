@@ -15,7 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import requests
-from boto3.dynamodb.conidtions import Key
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from chalice import Chalice
 from decimal import Decimal
@@ -30,7 +30,7 @@ logger.setLevel(logging.INFO)
 
 # Defining env vars:
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "fda-food-recalls")
-S3_BUCKET = os.environ.get("S3_BUCKET", "your-dp3-bucket")
+S3_BUCKET = os.environ.get("S3_BUCKET", "dp3-usda-ds5220")
 S3_PLOT_KEY = "dp3/fda-food-recalls/latest.png"
 
 dynamodb = boto3.resource("dynamodb")
@@ -47,7 +47,7 @@ def scan_recent_recalls(days: int = 90) -> list[dict]:
     items = []
     try:
         response = table.scan(
-            FilterExpression="report_date >= :cutoff"
+            FilterExpression="report_date >= :cutoff",
             ExpressionAttributeValues={":cutoff":cutoff},
         )
         items.extend(response("Items", []))
@@ -81,14 +81,14 @@ def get_latest_recall() -> dict | None:
 # Function to generate and upload plot to S3:
 def generate_and_upload_plot(items: list[dict]) -> str:
     """Build a weekly bar char of recall counts from `items` and upload to S3. Returns the S3 URL of the plot."""
-    logger.info("generating plot from %ed items", len(items))
+    logger.info("generating plot from %d items", len(items))
    
    # aggregating into week buckets:
     week_counts: Counter = Counter()
     for item in items:
         date_str = item.get("report_date", "")
         try:
-            dt = datetime.striptime(date_str, "%Y%m%d")
+            dt = datetime.strptime(date_str, "%Y%m%d")
             week_start = dt - timedelta(days = dt.weekday())
             week_counts[week_start] += 1
         except (ValueError, TypeError):

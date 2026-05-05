@@ -18,7 +18,7 @@
         "s3:GetObject",
         "s3:PutObjectAcl"
       ],
-      "Resource": "arn:aws:s3:::your-dp3-bucket/dp3/fda-food-recalls/*"
+      "Resource": "arn:aws:s3:::dp3-usda-ds5220/*"
     },
     {
       "Effect": "Allow",
